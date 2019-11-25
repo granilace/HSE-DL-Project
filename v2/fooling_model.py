@@ -19,7 +19,7 @@ class FoollingModel(nn.Module):
             raise ValueError("expected single image")
         return self.layers(x).flatten()
 
-    def get_jacobian(self, img_batch):
+    def get_matvecs(self, img_batch):
         input_size = np.prod(img_batch.shape[1:])
         batch_size = img_batch.shape[0]
         output_size = np.prod(self.forward(img_batch[0]).shape)
