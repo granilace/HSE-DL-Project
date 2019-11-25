@@ -1,3 +1,4 @@
+import numpy as np
 import time
 import torch
 import torch.autograd as autograd
@@ -12,40 +13,43 @@ class FoollingModel(nn.Module):
         self.img_size = img_size
         
     def forward(self, x):
-        batch_size = x.shape[0]
-        if x.dim() == 2:
-            x = x.reshape((batch_size, 3, self.img_size[0], self.img_size[1]))
-            return self.layers(x).reshape(batch_size, -1)
+        if x.dim() in (1, 3):
+            x = x.reshape((1, 3, self.img_size[0], self.img_size[1]))
         else:
-            return self.layers(x)
+            raise ValueError("expected single image")
+        return self.layers(x).flatten()
 
-    def single_get_matvecs(self, img_batch):
-        def _get_matvecs(img, v1=None, v2=None):
-            assert v1 is not None or v2 is not None
-            img_copy = torch.empty_like(img).copy_(img).unsqueeze(0).requires_grad_(True)
-            output = self.forward(img_copy).squeeze(0)
-            if v1 is None:
-                v1 = torch.zeros_like(img_copy.squeeze(0), device=self.device)
-                v2 = torch.empty_like(v2, device=self.device).copy_(v2).requires_grad_(True)
-            if v2 is None:
-                v1 = torch.empty_like(v1, device=self.device).copy_(v1)
-                v2 = torch.zeros_like(output, device=self.device).requires_grad_(True)
-            J_T_v2 = autograd.grad(v2.T @ output, img_copy, create_graph=True)[0].squeeze(0)
-            g = J_T_v2.T @ v1
-            v2.data = torch.zeros_like(v2)
-            J_v1 = autograd.grad(g, v2)[0]
+    def get_jacobian(self, img_batch):
+        input_size = np.prod(img_batch.shape[1:])
+        batch_size = img_batch.shape[0]
+        output_size = np.prod(self.forward(img_batch[0]).shape)
+        
+        def _get_matvecs(img, _v1=None, _v2=None):
+            assert _v1 is not None or _v2 is not None
+            assert _v1 is None or _v2 is None
+            img_copy = img.view(-1).requires_grad_(True)
+            output = self.forward(img_copy)
+            v1 = torch.zeros(input_size, device=self.device)
+            if _v1 is not None:
+                v1.copy_(_v1)
+            v2 = torch.zeros(output_size, device=self.device)
+            if _v2 is not None:
+                v2.copy_(_v2)
+            v2.requires_grad_(True)
+            J_T_v2 = autograd.grad(v2 @ output, img_copy, create_graph=True, retain_graph=True)[0]
+            J_v1 = autograd.grad(J_T_v2 @ v1, v2)[0]
             return J_v1.detach(), J_T_v2.detach()
         
         def matvec(v1):
-            return sum([
-                _get_matvecs(img.flatten(), v1=v1)[0]
+            return torch.stack([
+                _get_matvecs(img, _v1=v1)[0]
                 for img in img_batch
             ])
             
         def matvec_T(v2):
             return sum([
-                _get_matvecs(img.flatten(), v2=v2)[1]
-                for img in img_batch
+                _get_matvecs(img.flatten(), _v2=v2)[1]
+                for img, v2 in zip(img_batch, v2)
             ])
         
         return matvec, matvec_T
