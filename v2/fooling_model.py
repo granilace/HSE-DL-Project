@@ -4,6 +4,8 @@ import torch
 import torch.autograd as autograd
 import torch.nn as nn
 
+from utils import for_imagenet
+
 
 class FoollingModel(nn.Module):
     def __init__(self, layers, img_size=(224, 224), *args, **kwargs):
@@ -13,7 +15,10 @@ class FoollingModel(nn.Module):
         self.img_size = img_size
         
     def forward(self, x):
-        if x.dim() in (1, 3):
+        if x.dim() == 1:
+            x = x.reshape((3, self.img_size[0], self.img_size[1]))
+        if x.dim() == 3:
+            x = for_imagenet(x)
             x = x.reshape((1, 3, self.img_size[0], self.img_size[1]))
         else:
             raise ValueError("expected single image")
@@ -36,7 +41,7 @@ class FoollingModel(nn.Module):
             if _v2 is not None:
                 v2.copy_(_v2)
             v2.requires_grad_(True)
-            J_T_v2 = autograd.grad(v2 @ output, img_copy, create_graph=True, retain_graph=True)[0]
+            J_T_v2 = autograd.grad(v2 @ output, img_copy, create_graph=True)[0]
             J_v1 = autograd.grad(J_T_v2 @ v1, v2)[0]
             return J_v1.detach(), J_T_v2.detach()
         
