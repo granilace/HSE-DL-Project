@@ -16,27 +16,27 @@ to_255 = transforms.Compose([
 
 
 def for_imagenet(image):  # from 255 to net's expected range
-    return imagenet_normalization(image / 255.0)
+    if image.dim() == 3:
+        return imagenet_normalization(image / 255.0)
+    elif image.dim() == 4:
+        return torch.stack([for_imagenet(img) for img in image])
+    else:
+        raise ValueError('expected image of dim 3 or 4')
 
 def psi(x, p):
     return torch.sign(x) * torch.abs(x) ** (p - 1) if p != 1 else torch.sign(x)
 
 def conj(p):
-    return float(p) / (p - 1) if p != float('inf') else 1.0
+    return float(p) / (p - 1) if p != np.inf else 1.0
 
-def power_method(init, matvec, matvec_T, p=float('inf'), q=10, tol=1e-2, max_iter=20):
+def power_method(init, matvec, matvec_T, p=np.inf, q=10, max_iter=20):
     x = init / torch.norm(init, p)
     s = torch.norm(matvec(x), q)
     p_conj = conj(p)
-    prev_x = x.clone()
     for i in range(max_iter):
         S_x = psi(matvec_T(psi(matvec(x), q)), p_conj)
         x = S_x / torch.norm(S_x, p)
-        if torch.norm(prev_x - x, p) < tol:
-            break
-        prev_x = x
-        s = torch.norm(matvec(x), q)
-        print('s', s)
+    s = torch.norm(matvec(x), q)
     return x, s.item()
 
 def process_image(img):
