@@ -2,6 +2,7 @@ import torch
 import torch.autograd as autograd
 import torch.nn as nn
 import numpy as np
+from collections import OrderedDict
 from utils import for_imagenet
 
 
@@ -75,7 +76,7 @@ class BaseVGGFoolingModel(BaseFoolingModel):
 
 
 class VGG16FoolingModel(BaseVGGFoolingModel):
-    LAYERS_IDS = [
+    LAYERS_IDS = OrderedDict([
         ('block2_conv1', 6),
         ('block2_conv2', 8),
         ('block2_pool', 10),
@@ -83,11 +84,11 @@ class VGG16FoolingModel(BaseVGGFoolingModel):
         ('block3_conv2', 13),
         ('block3_conv3', 15),
         ('block3_pool', 17)
-    ]
+    ])
 
 
 class VGG19FoolingModel(BaseVGGFoolingModel):
-    LAYERS_IDS = [
+    LAYERS_IDS = OrderedDict([
         ('block2_conv1', 6),
         ('block2_conv2', 8),
         ('block2_pool', 10),
@@ -96,7 +97,7 @@ class VGG19FoolingModel(BaseVGGFoolingModel):
         ('block3_conv3', 15),
         ('block3_conv4', 17),
         ('block3_pool', 19)
-    ]
+    ])
 
 
 class BaseResNetFoolingModel(BaseFoolingModel):
@@ -118,11 +119,11 @@ class BaseResNetFoolingModel(BaseFoolingModel):
 
 
 class ResNet50FoolingModel(BaseResNetFoolingModel):
-    LAYERS_IDS = (
+    LAYERS_IDS = OrderedDict([
         ('conv1', 1),
         ('pool1', 4),
         ('block1', 5),
         ('block2', 6),
         ('block3', 7),
         ('block4', 8)
-    )
+    ])
