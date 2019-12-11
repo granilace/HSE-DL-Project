@@ -43,7 +43,7 @@ def process_image(img):
     img = (img - img.min()) / (img.max() - img.min())
     return torch.clamp(img.cpu().permute(1, 2, 0), 0, 1)
 
-def calculate_fooling_rate(model, layer_id, train_batch, val_data, perturb_norm, p=np.inf, q=10.0, max_iter=20):
+def construct_perturbation(model, layer_id, train_batch, perturb_norm, p=np.inf, q=10.0, max_iter=20):
     matvec, matvec_T = model.get_matvecs(train_batch, layer_id)
     perturb, _ = power_method(
         init=torch.rand(3 * 224 * 224, device=train_batch.device) - 0.5,
@@ -54,7 +54,9 @@ def calculate_fooling_rate(model, layer_id, train_batch, val_data, perturb_norm,
         max_iter=max_iter
     )
     normed_perturb = perturb.view(3, 224, 224) / torch.norm(perturb, p) * perturb_norm
-    
+    return normed_perturb
+
+def calculate_fooling_rate(model, perturbation, val_data):
     count_same = 0
     count_diff = 0
     inference_bs = 128
@@ -62,12 +64,12 @@ def calculate_fooling_rate(model, layer_id, train_batch, val_data, perturb_norm,
         val_batch = val_data[i * inference_bs: (i + 1) * inference_bs]
         with torch.no_grad():
             orig_output = model.full_forward(for_imagenet(val_batch))
-            perturb_output = model.full_forward(for_imagenet(val_batch + normed_perturb))
+            perturb_output = model.full_forward(for_imagenet(val_batch + perturbation))
         _, orig_preds = torch.softmax(orig_output, 1).max(1)
         _, perturb_preds = torch.softmax(perturb_output, 1).max(1)
         
         count_same += (perturb_preds == orig_preds).sum().item()
         count_diff += (perturb_preds != orig_preds).sum().item()
 
-    return float(count_diff) / (count_diff + count_same), normed_perturb.cpu()
+    return float(count_diff) / (count_diff + count_same)
 
